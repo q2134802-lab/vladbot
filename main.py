@@ -877,7 +877,7 @@ async def handle_send_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     admin_send_sessions.pop(ADMIN_ID, None)
     await update.message.reply_text(f"✅ Отправлено: {sent}\n❌ Ошибок: {failed}")
 
-    def main():
+def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(TypeHandler(Update, track_all), group=-1)
     app.add_handler(CommandHandler("start", start))
