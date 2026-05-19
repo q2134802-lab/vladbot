@@ -317,7 +317,7 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔓 Прочитать содержимое хуеты", callback_data=f"whisper:{secret_id}")]
+        [InlineKeyboardButton("🔓 вскрыть мать в прямом эфире ", callback_data=f"whisper:{secret_id}")]
     ])
 
     result = InlineQueryResultArticle(
@@ -348,7 +348,7 @@ async def whisper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if username != recipient:
         await query.answer(
-            f"🚫 Это сообщение только для @{secret['recipient_username']}.",
+            f"🚫 Это сообщение только для пидора @{secret['recipient_username']}.",
             show_alert=True
         )
         return
