@@ -323,7 +323,7 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = InlineQueryResultArticle(
         id=secret_id,
         title=f"💌 Шёпот для @{recipient_username}",
-        description=f"Нажми чтобы отправить секретное сообщение",
+        description=f"Жми еблан чтобы отправить секретное сообщение",
         input_message_content=InputTextMessageContent(
             f"🔒 Секретное сообщение для @{recipient_username}. Только избранный далбаеб может прочитать содержимое."
         ),
