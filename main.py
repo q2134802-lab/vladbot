@@ -897,6 +897,7 @@ def main():
     app.add_handler(CallbackQueryHandler(select_user_callback, pattern=r"^asel:"))
     app.add_handler(CallbackQueryHandler(send_confirm_callback, pattern=r"^asend_confirm$"))
     app.add_handler(CallbackQueryHandler(send_cancel_callback, pattern=r"^asend_cancel$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_ID), handle_send_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("Влад запущен!")
     app.run_polling()
