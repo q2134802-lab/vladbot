@@ -317,7 +317,7 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔓 Прочитать содержимое", callback_data=f"whisper:{secret_id}")]
+        [InlineKeyboardButton("🔓 Прочитать содержимое хуеты", callback_data=f"whisper:{secret_id}")]
     ])
 
     result = InlineQueryResultArticle(
@@ -325,7 +325,7 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         title=f"💌 Шёпот для @{recipient_username}",
         description=f"Нажми чтобы отправить секретное сообщение",
         input_message_content=InputTextMessageContent(
-            f"🔒 Секретное сообщение для @{recipient_username}. Только он может прочитать содержимое."
+            f"🔒 Секретное сообщение для @{recipient_username}. Только избранный далбаеб может прочитать содержимое."
         ),
         reply_markup=keyboard,
     )
