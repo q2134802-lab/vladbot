@@ -719,8 +719,7 @@ def main():
     print("Влад запущен!")
     print("Админ-бот запущен!")
 
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(asyncio.gather(
+    asyncio.run(asyncio.gather(
         app.run_polling(),
         admin_app.run_polling(),
     ))
