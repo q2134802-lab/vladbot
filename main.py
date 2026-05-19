@@ -333,7 +333,7 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def whisper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    # НЕ вызываем query.answer() здесь
 
     secret_id = query.data.split(":", 1)[1]
     secret = whisper_store.get(secret_id)
