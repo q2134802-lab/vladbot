@@ -428,7 +428,266 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN
 # ============================
 
+# ============================
+# АДМИН-БОТ
+# ============================
+
+import re as _re
+
+ADMIN_BOT_TOKEN = "8605091653:AAF8O1Qtl9tvA7YWaVAWoOt_8P1fOpVBK-g"
+
+admin_send_sessions: dict = {}
+
+def admin_only(func):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_user.id != ADMIN_ID:
+            await update.message.reply_text("⛔ Нет доступа.")
+            return
+        return await func(update, context)
+    return wrapper
+
+@admin_only
+async def admin_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = (
+        "👑 *Админ-панель Влада*\n\n"
+        "/stats — список пользователей\n"
+        "/logs — переписка пользователей\n"
+        "/broadcast — рассылка всем\n"
+        "/send — выборочная рассылка\n"
+        "/blocked — список заблокированных\n"
+    )
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+@admin_only
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    blocked = load_json(BLOCKED_FILE)
+    lines = []
+    for v in users_data.values():
+        uid = str(v["id"])
+        block_mark = "🚫" if uid in blocked else ""
+        lines.append(f"{block_mark}{v['name']} (@{v['username']}) — `{v['id']}`")
+    text = f"👥 Пользователей: {len(users_data)}\n\n" + ("\n".join(lines) or "Пусто")
+    for chunk in [text[i:i+4000] for i in range(0, len(text), 4000)]:
+        await update.message.reply_text(chunk, parse_mode="Markdown")
+
+@admin_only
+async def admin_logs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logs = load_json(LOGS_FILE)
+    if not users_data:
+        await update.message.reply_text("Пользователей пока нет.")
+        return
+    keyboard = []
+    for uid, udata in users_data.items():
+        msg_count = len(logs.get(uid, {}).get("messages", []))
+        username = f"@{udata['username']}" if udata["username"] else ""
+        keyboard.append([InlineKeyboardButton(f"{udata['name']} {username} [{msg_count} сообщ.]", callback_data=f"alog:{uid}:0")])
+    await update.message.reply_text("👤 Выбери пользователя:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def admin_log_page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != ADMIN_ID:
+        return
+    _, uid, page_str = query.data.split(":")
+    page = int(page_str)
+    logs = load_json(LOGS_FILE)
+    blocked = load_json(BLOCKED_FILE)
+    user_log = logs.get(uid)
+    if not user_log:
+        await query.edit_message_text("Логов нет.")
+        return
+    messages = user_log.get("messages", [])
+    name = users_data.get(uid, {}).get("name", uid)
+    username = users_data.get(uid, {}).get("username", "")
+    PAGE_SIZE = 5
+    total = len(messages)
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page_msgs = messages[page * PAGE_SIZE:min((page+1) * PAGE_SIZE, total)]
+    lines = [f"📋 *{name}* (@{username}) — стр. {page+1}/{total_pages}\n"]
+    for m in page_msgs:
+        lines.append(f"🕐 {m.get('time','')}\n👤 {m.get('user','')}\n🤖 {m.get('bot','')}\n{'─'*20}")
+    text = "\n".join(lines)[:4000]
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀️ Назад", callback_data=f"alog:{uid}:{page-1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("Вперёд ▶️", callback_data=f"alog:{uid}:{page+1}"))
+    is_blocked = uid in blocked
+    block_btn = InlineKeyboardButton("✅ Разблокировать" if is_blocked else "🚫 Заблокировать", callback_data=f"{'ablock' if not is_blocked else 'aunblock'}:{uid}")
+    keyboard = []
+    if nav:
+        keyboard.append(nav)
+    keyboard.append([block_btn])
+    keyboard.append([InlineKeyboardButton("🔙 К списку", callback_data="alogs_list")])
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def admin_logs_list_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != ADMIN_ID:
+        return
+    logs = load_json(LOGS_FILE)
+    keyboard = []
+    for uid, udata in users_data.items():
+        msg_count = len(logs.get(uid, {}).get("messages", []))
+        username = f"@{udata['username']}" if udata["username"] else ""
+        keyboard.append([InlineKeyboardButton(f"{udata['name']} {username} [{msg_count} сообщ.]", callback_data=f"alog:{uid}:0")])
+    await query.edit_message_text("👤 Выбери пользователя:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def admin_block_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != ADMIN_ID:
+        return
+    action, uid = query.data.split(":", 1)
+    blocked = load_json(BLOCKED_FILE)
+    name = users_data.get(uid, {}).get("name", uid)
+    if action == "ablock":
+        blocked[uid] = True
+        save_json(BLOCKED_FILE, blocked)
+        await query.answer(f"🚫 {name} заблокирован.", show_alert=True)
+    elif action == "aunblock":
+        blocked.pop(uid, None)
+        save_json(BLOCKED_FILE, blocked)
+        await query.answer(f"✅ {name} разблокирован.", show_alert=True)
+    is_blocked = uid in blocked
+    block_btn = InlineKeyboardButton("✅ Разблокировать" if is_blocked else "🚫 Заблокировать", callback_data=f"{'ablock' if not is_blocked else 'aunblock'}:{uid}")
+    current_markup = query.message.reply_markup
+    if current_markup:
+        new_keyboard = []
+        for row in current_markup.inline_keyboard:
+            new_row = []
+            for btn in row:
+                if btn.callback_data and (btn.callback_data.startswith("ablock:") or btn.callback_data.startswith("aunblock:")):
+                    new_row.append(block_btn)
+                else:
+                    new_row.append(btn)
+            new_keyboard.append(new_row)
+        try:
+            await query.edit_message_reply_markup(InlineKeyboardMarkup(new_keyboard))
+        except:
+            pass
+
+@admin_only
+async def admin_blocked_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    blocked = load_json(BLOCKED_FILE)
+    if not blocked:
+        await update.message.reply_text("Заблокированных нет.")
+        return
+    lines = []
+    keyboard = []
+    for uid in blocked:
+        udata = users_data.get(uid, {})
+        name = udata.get("name", uid)
+        username = udata.get("username", "")
+        lines.append(f"🚫 {name} (@{username}) — `{uid}`")
+        keyboard.append([InlineKeyboardButton(f"✅ Разблокировать {name}", callback_data=f"aunblock:{uid}")])
+    await update.message.reply_text("🚫 *Заблокированные:*\n\n" + "\n".join(lines), parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+@admin_only
+async def admin_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = " ".join(context.args).strip() if context.args else ""
+    if not text:
+        await update.message.reply_text("Использование: /broadcast <текст>")
+        return
+    blocked = load_json(BLOCKED_FILE)
+    sent = failed = 0
+    from telegram import Bot
+    bot = Bot(token=TELEGRAM_TOKEN)
+    for uid, udata in users_data.items():
+        if uid in blocked:
+            continue
+        try:
+            await bot.send_message(chat_id=udata["id"], text=text)
+            sent += 1
+        except:
+            failed += 1
+        await asyncio.sleep(0.05)
+    await update.message.reply_text(f"✅ Отправлено: {sent}\n❌ Ошибок: {failed}")
+
+def build_admin_send_keyboard(selected: set) -> InlineKeyboardMarkup:
+    keyboard = []
+    for uid, udata in users_data.items():
+        check = "✅ " if uid in selected else ""
+        username = f"@{udata['username']}" if udata["username"] else ""
+        keyboard.append([InlineKeyboardButton(f"{check}{udata['name']} {username}", callback_data=f"asel:{uid}")])
+    keyboard.append([InlineKeyboardButton("📤 Отправить выбранным", callback_data="asend_confirm"), InlineKeyboardButton("❌ Отмена", callback_data="asend_cancel")])
+    return InlineKeyboardMarkup(keyboard)
+
+@admin_only
+async def admin_send_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not users_data:
+        await update.message.reply_text("Пользователей нет.")
+        return
+    admin_send_sessions[ADMIN_ID] = {"selected": set(), "step": "selecting"}
+    await update.message.reply_text("✉️ Выбери получателей:", parse_mode="Markdown", reply_markup=build_admin_send_keyboard(set()))
+
+async def admin_select_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != ADMIN_ID:
+        return
+    uid = query.data.split(":", 1)[1]
+    session = admin_send_sessions.get(ADMIN_ID, {"selected": set(), "step": "selecting"})
+    selected = session["selected"]
+    if uid in selected:
+        selected.remove(uid)
+    else:
+        selected.add(uid)
+    admin_send_sessions[ADMIN_ID] = session
+    await query.edit_message_text(f"✉️ Выбрано: *{len(selected)}* получателей:", parse_mode="Markdown", reply_markup=build_admin_send_keyboard(selected))
+
+async def admin_send_confirm_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != ADMIN_ID:
+        return
+    session = admin_send_sessions.get(ADMIN_ID, {})
+    selected = session.get("selected", set())
+    if not selected:
+        await query.answer("Никого не выбрано!", show_alert=True)
+        return
+    admin_send_sessions[ADMIN_ID]["step"] = "awaiting_text"
+    await query.edit_message_text(f"✍️ Выбрано {len(selected)} чел. Напиши текст сообщения:")
+
+async def admin_send_cancel_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if update.effective_user.id != ADMIN_ID:
+        return
+    admin_send_sessions.pop(ADMIN_ID, None)
+    await query.edit_message_text("❌ Рассылка отменена.")
+
+async def admin_handle_send_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID:
+        return
+    session = admin_send_sessions.get(ADMIN_ID, {})
+    if session.get("step") != "awaiting_text":
+        return
+    text = update.message.text.strip()
+    selected = session.get("selected", set())
+    from telegram import Bot
+    bot = Bot(token=TELEGRAM_TOKEN)
+    sent = failed = 0
+    for uid in selected:
+        udata = users_data.get(uid)
+        if not udata:
+            continue
+        try:
+            await bot.send_message(chat_id=udata["id"], text=text)
+            sent += 1
+        except:
+            failed += 1
+        await asyncio.sleep(0.05)
+    admin_send_sessions.pop(ADMIN_ID, None)
+    await update.message.reply_text(f"✅ Отправлено: {sent}\n❌ Ошибок: {failed}")
+
+# ============================
+# MAIN
+# ============================
+
 def main():
+    # Основной бот
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(TypeHandler(Update, track_all), group=-1)
     app.add_handler(CommandHandler("start", start))
@@ -440,8 +699,31 @@ def main():
     app.add_handler(InlineQueryHandler(inline_query))
     app.add_handler(CallbackQueryHandler(whisper_callback, pattern=r"^whisper:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    # Админ-бот
+    admin_app = ApplicationBuilder().token(ADMIN_BOT_TOKEN).build()
+    admin_app.add_handler(CommandHandler("start", admin_start))
+    admin_app.add_handler(CommandHandler("stats", admin_stats))
+    admin_app.add_handler(CommandHandler("logs", admin_logs_cmd))
+    admin_app.add_handler(CommandHandler("broadcast", admin_broadcast))
+    admin_app.add_handler(CommandHandler("send", admin_send_cmd))
+    admin_app.add_handler(CommandHandler("blocked", admin_blocked_cmd))
+    admin_app.add_handler(CallbackQueryHandler(admin_log_page_callback, pattern=r"^alog:"))
+    admin_app.add_handler(CallbackQueryHandler(admin_logs_list_callback, pattern=r"^alogs_list$"))
+    admin_app.add_handler(CallbackQueryHandler(admin_block_callback, pattern=r"^(ablock|aunblock):"))
+    admin_app.add_handler(CallbackQueryHandler(admin_select_callback, pattern=r"^asel:"))
+    admin_app.add_handler(CallbackQueryHandler(admin_send_confirm_callback, pattern=r"^asend_confirm$"))
+    admin_app.add_handler(CallbackQueryHandler(admin_send_cancel_callback, pattern=r"^asend_cancel$"))
+    admin_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handle_send_text))
+
     print("Влад запущен!")
-    app.run_polling()
+    print("Админ-бот запущен!")
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(asyncio.gather(
+        app.run_polling(),
+        admin_app.run_polling(),
+    ))
 
 if __name__ == "__main__":
     main()
