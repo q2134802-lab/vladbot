@@ -878,6 +878,7 @@ async def handle_send_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Отправлено: {sent}\n❌ Ошибок: {failed}")
 def main():
     # Основной бот
+    def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     app.add_handler(TypeHandler(Update, track_all), group=-1)
     app.add_handler(CommandHandler("start", start))
@@ -898,30 +899,8 @@ def main():
     app.add_handler(CallbackQueryHandler(send_confirm_callback, pattern=r"^asend_confirm$"))
     app.add_handler(CallbackQueryHandler(send_cancel_callback, pattern=r"^asend_cancel$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # Админ-бот
-    admin_app = ApplicationBuilder().token(ADMIN_BOT_TOKEN).build()
-    admin_app.add_handler(CommandHandler("start", admin_start))
-    admin_app.add_handler(CommandHandler("stats", admin_stats))
-    admin_app.add_handler(CommandHandler("logs", admin_logs_cmd))
-    admin_app.add_handler(CommandHandler("broadcast", admin_broadcast))
-    admin_app.add_handler(CommandHandler("send", admin_send_cmd))
-    admin_app.add_handler(CommandHandler("blocked", admin_blocked_cmd))
-    admin_app.add_handler(CallbackQueryHandler(admin_log_page_callback, pattern=r"^alog:"))
-    admin_app.add_handler(CallbackQueryHandler(admin_logs_list_callback, pattern=r"^alogs_list$"))
-    admin_app.add_handler(CallbackQueryHandler(admin_block_callback, pattern=r"^(ablock|aunblock):"))
-    admin_app.add_handler(CallbackQueryHandler(admin_select_callback, pattern=r"^asel:"))
-    admin_app.add_handler(CallbackQueryHandler(admin_send_confirm_callback, pattern=r"^asend_confirm$"))
-    admin_app.add_handler(CallbackQueryHandler(admin_send_cancel_callback, pattern=r"^asend_cancel$"))
-    admin_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_handle_send_text))
-
     print("Влад запущен!")
-    print("Админ-бот запущен!")
-
-    asyncio.run(asyncio.gather(
-        app.run_polling(),
-        admin_app.run_polling(),
-    ))
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
