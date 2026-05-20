@@ -314,8 +314,7 @@ async def whisper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = secret["sender_id"]
     if username != recipient and username != sender_username and user.id != sender_id:
         await query.answer(
-            f"🚫 куда лезем баран, не тебе адресовано ублюдок , вот твой хозяин  @{secret['recipient_username']} ",
-            show_alert=True
+            "🚫 Куда лезешь сын помойной шлюхи? Не тебе адресовано!",
         )
         return
     await query.answer(
