@@ -259,7 +259,8 @@ async def ask_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ШЁПОТ
 # ============================
 
-whisper_store: dict = {}
+WHISPER_FILE = "whispers.json"
+whisper_store: dict = load_json(WHISPER_FILE)
 
 async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query.query.strip()
@@ -284,15 +285,16 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "sender_username": (sender.username or "").lower(),
         "recipient_username": recipient_username,
     }
+    save_json(WHISPER_FILE, whisper_store)
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔓 вскрыть мать в прямом эфире ", callback_data=f"whisper:{secret_id}")]
+        [InlineKeyboardButton("🔓 вскрыть мать в прямом эфире 🎀 ", callback_data=f"whisper:{secret_id}")]
     ])
     result = InlineQueryResultArticle(
         id=secret_id,
-        title=f"💌 Шёпот для ебланчика  @{recipient_username}",
-        description="Жми тупая овца,  чтобы отправить секретное сообщение",
+        title=f"💌 Шёпот для @{recipient_username}",
+        description="Жми тварь чтобы отправить секретное сообщение",
         input_message_content=InputTextMessageContent(
-            f"🔒 Секретное сообщение для мрази @{recipient_username}. Только сучки могут прочитать содержимое."
+            f"🔒 Секретное сообщение для ебланоида💖 @{recipient_username}. Только сыновья шлюх могут прочитать содержимое."
         ),
         reply_markup=keyboard,
     )
@@ -312,7 +314,7 @@ async def whisper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = secret["sender_id"]
     if username != recipient and username != sender_username and user.id != sender_id:
         await query.answer(
-            f"🚫 куда лезешь сын шлюхи , не тебе же адресовано @{secret['recipient_username']} и отправителя.",
+            f"🚫 куда лезем баран, не тебе адресовано ублюдок , вот твой хозяин  @{secret['recipient_username']} ",
             show_alert=True
         )
         return
@@ -400,5 +402,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
