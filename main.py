@@ -4,8 +4,17 @@ import re
 import asyncio
 import json
 import httpx
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, TypeHandler, filters, ContextTypes
+from uuid import uuid4
+from telegram import (
+    Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, KeyboardButton,
+    InlineQueryResultArticle, InputTextMessageContent
+)
+from telegram.ext import (
+    ApplicationBuilder, MessageHandler, CommandHandler,
+    TypeHandler, CallbackQueryHandler, InlineQueryHandler,
+    filters, ContextTypes
+)
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "")
@@ -245,6 +254,73 @@ async def ask_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Все модели сейчас перегружены, попробуй чуть позже.")
 
+
+# ============================
+# ШЁПОТ
+# ============================
+
+whisper_store: dict = {}
+
+async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.inline_query.query.strip()
+    match = __import__('re').match(r"^(.+?)\s+@(\w+)$", query)
+    if not match:
+        result = InlineQueryResultArticle(
+            id="hint",
+            title="✉️ Отправить шёпот",
+            description="Формат: текст сообщения @username",
+            input_message_content=InputTextMessageContent("ℹ️ Формат: @бот текст @username"),
+        )
+        await update.inline_query.answer([result], cache_time=0)
+        return
+    secret_text = match.group(1).strip()
+    recipient_username = match.group(2).strip().lower()
+    sender = update.inline_query.from_user
+    secret_id = str(uuid4())
+    whisper_store[secret_id] = {
+        "text": secret_text,
+        "sender_id": sender.id,
+        "sender_name": sender.full_name,
+        "sender_username": (sender.username or "").lower(),
+        "recipient_username": recipient_username,
+    }
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔓 вскрыть мать в прямом эфире ", callback_data=f"whisper:{secret_id}")]
+    ])
+    result = InlineQueryResultArticle(
+        id=secret_id,
+        title=f"💌 Шёпот для ебланчика  @{recipient_username}",
+        description="Жми тупая овца,  чтобы отправить секретное сообщение",
+        input_message_content=InputTextMessageContent(
+            f"🔒 Секретное сообщение для мрази @{recipient_username}. Только он и отправитель могут прочитать содержимое."
+        ),
+        reply_markup=keyboard,
+    )
+    await update.inline_query.answer([result], cache_time=0)
+
+async def whisper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    secret_id = query.data.split(":", 1)[1]
+    secret = whisper_store.get(secret_id)
+    if not secret:
+        await query.answer("❌ Сообщение не найдено.", show_alert=True)
+        return
+    user = query.from_user
+    username = (user.username or "").lower()
+    recipient = secret["recipient_username"].lower()
+    sender_username = secret["sender_username"].lower()
+    sender_id = secret["sender_id"]
+    if username != recipient and username != sender_username and user.id != sender_id:
+        await query.answer(
+            f"🚫 куда лезешь сын шлюхи , не тебе же адресовано @{secret['recipient_username']} и отправителя.",
+            show_alert=True
+        )
+        return
+    await query.answer(
+        f"💌 Сообщение от {secret['sender_name']}:\n\n{secret['text']}",
+        show_alert=True
+    )
+
 # ============================
 # ОБРАБОТЧИК СООБЩЕНИЙ
 # ============================
@@ -316,6 +392,8 @@ def main():
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("ask", ask_cmd))
+    app.add_handler(InlineQueryHandler(inline_query))
+    app.add_handler(CallbackQueryHandler(whisper_callback, pattern=r"^whisper:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("Влад запущен!")
     app.run_polling()
