@@ -292,7 +292,7 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         title=f"💌 Шёпот для ебланчика  @{recipient_username}",
         description="Жми тупая овца,  чтобы отправить секретное сообщение",
         input_message_content=InputTextMessageContent(
-            f"🔒 Секретное сообщение для мрази @{recipient_username}. Только он и отправитель могут прочитать содержимое."
+            f"🔒 Секретное сообщение для мрази @{recipient_username}. Только сучки могут прочитать содержимое."
         ),
         reply_markup=keyboard,
     )
